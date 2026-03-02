@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>机甲斗兽场 (Mechabellum) 战术复盘图生成器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        
+        #drop-zone {
+            border: 2px dashed #00bcd4;
+            padding: 40px;
+            width: 600px;
+            text-align: center;
+            border-radius: 12px;
+            background-color: #1a1a1a;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        #drop-zone.hover {
+            background-color: #252525;
+            border-color: #4caf50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .controls { margin-top: 20px; display: flex; gap: 15px; }
+        
+        button {
+            padding: 10px 25px;
+            font-size: 14px;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { background-color: #444; }
+        #downloadBtn { background-color: #00bcd4; color: #000; border: none; display: none; }
+        #downloadBtn:hover { background-color: #008ba3; }
+
+        #capture-area {
+            width: 900px;
+            background-color: #181818;
+            margin-top: 30px;
+            padding: 30px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .players-title {
+            display: flex;
+            justify-content: space-between;
+            font-size: 26px;
+            font-weight: bold;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        .player-name-a { color: #ff5252; flex: 1; text-align: right; }
+        .player-name-b { color: #448aff; flex: 1; text-align: left; }
+        .vs { padding: 0 30px; color: #666; font-style: italic; }
+
+        .timeline-row {
+            display: flex;
+            margin-bottom: 25px;
+            align-items: center;
+            background: #202020;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .info-box {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            min-height: 80px;
+        }
+        .info-box.left { border-right: 3px solid #ff5252; text-align: right; }
+        .info-box.right { border-left: 3px solid #448aff; text-align: left; }
+        
+        .hp-bar { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .hp-val { font-weight: bold; font-size: 14px; margin-left: 5px; color: #eee;}
+        .units-list { color: #ffd54f; margin-top: 8px; line-height: 1.6; }
+        .empty-hint { color: #555; font-style: italic; }
+        
+        /* 迷你沙盘 Canvas 容器 */
+        .map-container {
+            width: 320px;
+            height: 200px;
+            margin: 0 20px;
+            background-color: #111;
+            border: 1px solid #333;
+            border-radius: 6px;
+            position: relative;
+        }
+        .round-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 13px;
+            z-index: 10;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🛠️ 机甲斗兽场 对局复盘图生成器</h1>
+        <div id="drop-zone">
+            📥 将 .grbr / .replay 录像文件拖拽到此处，或点击上传
+        </div>
+        <input type="file" id="fileInput" style="display: none" accept=".grbr,.replay" onchange="handleFile(this.files[0])">
+        
+        <div class="controls">
+            <button id="langBtn" onclick="toggleLang()">🌐 当前语言: 中文</button>
+            <button id="downloadBtn" onclick="downloadImage()">⬇️ 保存为高清长图</button>
+        </div>
+    </div>
+
+    <div id="capture-area">
+        <div class="players-title">
+            <div class="player-name-a" id="playerA">玩家 A (红方)</div>
+            <div class="vs">VS</div>
+            <div class="player-name-b" id="playerB">玩家 B (蓝方)</div>
+        </div>
+        <div id="timeline-container"></div>
+    </div>
+
+<script>
+    // 严格按照 Game_glossary.csv 提取的双语字典
+    const unitDict = {
+        "1": { cn: "尖牙", en: "Fang", short: "牙" },
+        "2": { cn: "爬虫", en: "Crawler", short: "爬" },
+        "3": { cn: "长弓", en: "Marksman", short: "弓" },
+        "4": { cn: "弧光", en: "Arclight", short: "弧" },
+        "5": { cn: "野马", en: "Mustang", short: "马" },
+        "6": { cn: "钢球", en: "Steel Ball", short: "球" },
+        "7": { cn: "霸主", en: "Overlord", short: "霸" },
+        "8": { cn: "暴雨", en: "Stormcaller", short: "雨" },
+        "9": { cn: "熔点", en: "Melting Point", short: "熔" },
+        "10": { cn: "铁锤", en: "Sledgehammer", short: "锤" },
+        "11": { cn: "火神", en: "Vulcan", short: "火" },
+        "12": { cn: "骇客", en: "Hacker", short: "骇" },
+        "13": { cn: "犀牛", en: "Rhino", short: "犀" },
+        "14": { cn: "凤凰", en: "Phoenix", short: "凤" },
+        "15": { cn: "兵蜂", en: "Wasp", short: "蜂" },
+        "16": { cn: "堡垒", en: "Fortress", short: "堡" },
+        "17": { cn: "沙虫", en: "Sandworm", short: "沙" },
+        "18": { cn: "狂蝎", en: "Scorpion", short: "蝎" },
+        "19": { cn: "火炮", en: "Marksman", short: "炮" },
+        "20": { cn: "雷神", en: "Vulcan", short: "雷" },
+        "21": { cn: "恶灵", en: "Wraith", short: "幽" },
+        "22": { cn: "狼蛛", en: "Tarantula", short: "蛛" },
+        "23": { cn: "剑齿虎", en: "Sabertooth", short: "虎" },
+        "24": { cn: "战争工厂", en: "War Factory", short: "厂" },
+        "25": { cn: "台风", en: "Typhoon", short: "风" },
+        "26": { cn: "火獾", en: "Fire Badger", short: "獾" },
+    };
+
+    let currentLang = 'cn';
+    let globalXmlDoc = null; // 存储解析好的 XML
+
+    // 【极其重要的修复】：全局拦截浏览器的默认拖拽，防止直接下载文件
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+        document.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragover', () => dropZone.classList.add('hover'));
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+    dropZone.addEventListener('drop', (e) => {
+        dropZone.classList.remove('hover');
+        handleFile(e.dataTransfer.files[0]);
+    });
+    dropZone.addEventListener('click', () => document.getElementById('fileInput').click());
+
+    function toggleLang() {
+        currentLang = currentLang === 'cn' ? 'en' : 'cn';
+        document.getElementById('langBtn').innerText = currentLang === 'cn' ? '🌐 当前语言: 中文' : '🌐 Language: English';
+        if(globalXmlDoc) parseAndRender(globalXmlDoc);
+    }
+
+    function handleFile(file) {
+        if (!file) return;
+        dropZone.innerText = "读取中...";
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const bytes = new Uint8Array(e.target.result);
+            let start = -1;
+            // 定位 <?xml
+            for (let i = 0; i < bytes.length - 5; i++) {
+                if (bytes[i]===60 && bytes[i+1]===63 && bytes[i+2]===120) { start = i; break; }
+            }
+            if (start === -1) {
+                dropZone.innerText = "解析失败：未找到有效对局数据";
+                return;
+            }
+
+            // 截取掉尾部可能存在的损坏二进制片段，保证解析绝对安全
+            let cleanStr = new TextDecoder("utf-8", { fatal: false }).decode(bytes.slice(start));
+            let endMatch = cleanStr.lastIndexOf("</BattleRecord>");
+            if(endMatch !== -1) cleanStr = cleanStr.substring(0, endMatch + 15);
+
+            const parser = new DOMParser();
+            globalXmlDoc = parser.parseFromString(cleanStr, "text/xml");
+            
+            if (globalXmlDoc.getElementsByTagName("parsererror").length > 0) {
+                alert("录像格式出现偏差，已尽可能解析。");
+            }
+            dropZone.innerText = "解析成功！可继续拖入新文件";
+            parseAndRender(globalXmlDoc);
+        };
+        // 关键：必须作为字节流读取
+        reader.readAsArrayBuffer(file);
+    }
+
+    function parseAndRender(xml) {
+        const players = xml.querySelectorAll("PlayerRecord");
+        if (players.length < 2) return;
+
+        document.getElementById('playerA').innerText = players[0].querySelector("name").textContent + " (红)";
+        document.getElementById('playerB').innerText = players[1].querySelector("name").textContent + " (蓝)";
+
+        const roundsA = players[0].querySelectorAll("PlayerRoundRecord");
+        const roundsB = players[1].querySelectorAll("PlayerRoundRecord");
+        
+        // **沙盘坐标系自适应计算**
+        let bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        xml.querySelectorAll("NewUnitData > Position").forEach(pos => {
+            const x = parseFloat(pos.querySelector("x")?.textContent || 0);
+            const y = parseFloat(pos.querySelector("y")?.textContent || 0);
+            if(x < bounds.minX) bounds.minX = x;
+            if(x > bounds.maxX) bounds.maxX = x;
+            if(y < bounds.minY) bounds.minY = y;
+            if(y > bounds.maxY) bounds.maxY = y;
+        });
+        // 增加边距
+        bounds.minX -= 50; bounds.maxX += 50; bounds.minY -= 50; bounds.maxY += 50;
+
+        let html = "";
+        let historyA = {}, historyB = {};
+        let mapJobs = [];
+
+        // 假设初始布局是 R0，实战一般展示 R1 及以后，但为防遗漏这里抓取了全量
+        for (let i = 0; i < roundsA.length; i++) {
+            const rNum = roundsA[i].querySelector("round").textContent;
+            
+            const hpA = roundsA[i].querySelector("reactorCore")?.textContent || "0";
+            const hpB = roundsB[i].querySelector("reactorCore")?.textContent || "0";
+
+            const unitsA = getUnitsDetail(roundsA[i]);
+            const unitsB = getUnitsDetail(roundsB[i]);
+
+            const countsA = countUnits(unitsA);
+            const countsB = countUnits(unitsB);
+            
+            // 当前回合新增的单位 = 本回合总数 - 上回合总数
+            const diffA = calculateDiff(historyA, countsA);
+            const diffB = calculateDiff(historyB, countsB);
+            historyA = countsA; historyB = countsB;
+
+            // 首回合显示“初始部署”，否则显示差异
+            const isInitial = (i === 0);
+            
+            const canvasId = `map-canvas-${rNum}`;
+            const hpLabel = currentLang === 'cn' ? "生命值" : "HP";
+
+            html += `
+                <div class="timeline-row">
+                    <div class="info-box left">
+                        <div class="hp-bar">${hpLabel} <span class="hp-val">${hpA}</span></div>
+                        <div class="units-list">${formatDiff(isInitial ? countsA : diffA, isInitial)}</div>
+                    </div>
+                    <div class="map-container">
+                        <div class="round-badge">Round ${rNum}</div>
+                        <canvas id="${canvasId}" width="320" height="200"></canvas>
+                    </div>
+                    <div class="info-box right">
+                        <div class="hp-bar">${hpLabel} <span class="hp-val">${hpB}</span></div>
+                        <div class="units-list">${formatDiff(isInitial ? countsB : diffB, isInitial)}</div>
+                    </div>
+                </div>
+            `;
+            mapJobs.push({ id: canvasId, unitsA, unitsB });
+        }
+
+        document.getElementById('timeline-container').innerHTML = html;
+        document.getElementById('capture-area').style.display = 'block';
+        document.getElementById('downloadBtn').style.display = 'inline-block';
+
+        // 渲染 Canvas 棋盘沙盘
+        setTimeout(() => {
+            mapJobs.forEach(job => drawMap(job.id, job.unitsA, job.unitsB, bounds));
+        }, 100);
+    }
+
+    function getUnitsDetail(node) {
+        let res = [];
+        node.querySelectorAll("NewUnitData").forEach(u => {
+            res.push({
+                id: u.querySelector("id")?.textContent,
+                x: parseFloat(u.querySelector("Position > x")?.textContent || 0),
+                y: parseFloat(u.querySelector("Position > y")?.textContent || 0),
+                rot: u.querySelector("IsRotate")?.textContent === 'true'
+            });
+        });
+        return res;
+    }
+
+    function countUnits(list) {
+        let c = {};
+        list.forEach(u => c[u.id] = (c[u.id] || 0) + 1);
+        return c;
+    }
+
+    function calculateDiff(old, now) {
+        let diff = {};
+        for (let id in now) {
+            let added = now[id] - (old[id] || 0);
+            if (added > 0) diff[id] = added;
+        }
+        return diff;
+    }
+
+    function formatDiff(diff, isInit) {
+        let items = [];
+        for (let id in diff) {
+            let info = unitDict[id];
+            let name = info ? info[currentLang] : `未知[${id}]`;
+            let prefix = isInit ? "" : "+ ";
+            items.push(`${prefix}${diff[id]} x ${name}`);
+        }
+        if (!items.length) return `<span class="empty-hint">${currentLang==='cn'?'无阵型变动':'No new deployment'}</span>`;
+        return items.join('<br>');
+    }
+
+    function drawMap(canvasId, unitsA, unitsB, bounds) {
+        const cvs = document.getElementById(canvasId);
+        if (!cvs) return;
+        const ctx = cvs.getContext('2d');
+        const w = cvs.width, h = cvs.height;
+
+        // 画中心线
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 坐标映射：因为 X是横向, Y是纵向。我们通过 bounds 自适应。
+        const rangeX = bounds.maxX - bounds.minX || 1;
+        const rangeY = bounds.maxY - bounds.minY || 1;
+
+        function renderU(u, color) {
+            const cx = ((u.x - bounds.minX) / rangeX) * w;
+            const cy = ((u.y - bounds.minY) / rangeY) * h;
+            
+            // 画圆底
+            ctx.beginPath();
+            ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            // 如果绕后/侧翼 (IsRotate = true)，画个白框高亮
+            if (u.rot) {
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            // 写单字简称
+            ctx.fillStyle = "#fff";
+            ctx.font = "10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(unitDict[u.id]?.short || "?", cx, cy);
+        }
+
+        unitsA.forEach(u => renderU(u, "#ff5252"));
+        unitsB.forEach(u => renderU(u, "#448aff"));
+    }
+
+    function downloadImage() {
+        const btn = document.getElementById('downloadBtn');
+        btn.innerText = "⌛ 正在生成图片...";
+        html2canvas(document.getElementById('capture-area'), {
+            backgroundColor: '#121212', scale: 2
+        }).then(canvas => {
+            const a = document.createElement('a');
+            a.download = `复盘战报_${new Date().getTime()}.png`;
+            a.href = canvas.toDataURL("image/png");
+            a.click();
+            btn.innerText = "⬇️ 保存为高清长图";
+        });
+    }
+</script>
+</body>
+</html>
