@@ -2,17 +2,18 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>钢铁指挥官 (Mechabellum) 战术复盘图生成器</title>
+    <title>钢铁指挥官 战术复盘工作台 v1.5.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
-            --bg-color: #0f0f11;
-            --panel-bg: #1a1a1d;
-            --border-color: #2c2c35;
+            --bg-color: #0f0f12;
+            --panel-bg: #1c1c21;
+            --border-color: #2d2d38;
             --primary: #00bcd4;
-            --red: #e53935;
-            --blue: #1e88e5;
+            --red: #f44336;
+            --blue: #29b6f6;
             --text-main: #e0e0e0;
+            --text-muted: #888;
         }
 
         body {
@@ -24,56 +25,53 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            overflow-x: hidden;
         }
 
         .header { text-align: center; margin-bottom: 20px; width: 100%; max-width: 900px;}
-        .header h1 { margin-bottom: 5px; font-size: 28px; letter-spacing: 1px;}
-        .header p { color: #888; font-size: 14px;}
+        .header h1 { margin-bottom: 5px; font-size: 32px; letter-spacing: 2px; color: #fff;}
+        .meta-info { color: var(--text-muted); font-size: 13px; margin-bottom: 15px;}
+        .highlight { color: var(--primary); font-weight: bold; }
         
         #drop-zone {
-            border: 2px dashed #555;
+            border: 2px dashed #444;
             padding: 40px;
             text-align: center;
             border-radius: 12px;
-            background-color: #151515;
+            background-color: #141418;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin: 20px auto;
+            margin: 0 auto;
             color: #aaa;
             font-size: 16px;
         }
         #drop-zone.hover {
-            background-color: #222;
+            background-color: #1e1e24;
             border-color: var(--primary);
             color: var(--primary);
             box-shadow: 0 0 20px rgba(0, 188, 212, 0.2);
         }
 
         .controls { 
-            margin-top: 15px; 
+            margin-top: 20px; 
             display: flex; 
             gap: 15px; 
             justify-content: center;
-            display: none; /* 初始隐藏，解析成功后显示 */
+            display: none; 
             flex-wrap: wrap;
         }
         
         button {
             padding: 10px 20px;
             font-size: 14px;
-            background-color: #2a2a30;
+            background-color: #2b2b36;
             color: #fff;
             border: 1px solid #444;
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
             transition: 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
-        button:hover { background-color: #383842; }
+        button:hover { background-color: #3b3b4a; }
         .btn-active { border-color: var(--primary); color: var(--primary); }
         .btn-primary { background-color: var(--primary); color: #000; border: none; }
         .btn-primary:hover { background-color: #009eb3; }
@@ -87,7 +85,19 @@
             border-radius: 12px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.6);
             display: none;
-            border: 1px solid #252528;
+            border: 1px solid #282833;
+        }
+
+        .game-version-badge {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            background: #111;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            border: 1px solid #333;
         }
         
         .players-title {
@@ -110,7 +120,7 @@
             align-items: center;
             gap: 20px;
             margin-bottom: 25px;
-            background: #111;
+            background: #121215;
             padding: 15px;
             border-radius: 8px;
             border: 1px solid #222;
@@ -124,15 +134,15 @@
             letter-spacing: 1px;
         }
 
-        /* 回合行卡片 */
+        /* 回合卡片 */
         .timeline-row {
             display: flex;
             margin-bottom: 25px;
             align-items: stretch;
-            background: #161619;
+            background: #16161a;
             border-radius: 10px;
             padding: 20px;
-            border: 1px solid #222;
+            border: 1px solid #25252d;
         }
         .info-box {
             flex: 1;
@@ -141,12 +151,12 @@
             flex-direction: column;
             justify-content: center;
         }
-        .info-box.left { padding-right: 20px; text-align: right; border-right: 3px solid rgba(229, 57, 53, 0.3);}
-        .info-box.right { padding-left: 20px; text-align: left; border-left: 3px solid rgba(30, 136, 229, 0.3);}
+        .info-box.left { padding-right: 20px; text-align: right; border-right: 3px solid rgba(244, 67, 54, 0.3);}
+        .info-box.right { padding-left: 20px; text-align: left; border-left: 3px solid rgba(41, 182, 246, 0.3);}
         
-        .hp-bar { font-size: 12px; color: #888; margin-bottom: 10px; font-weight: bold;}
+        .hp-bar { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; font-weight: bold;}
         .hp-val { font-weight: 900; font-size: 16px; margin-left: 5px; color: #fff;}
-        .units-list { color: #ffca28; line-height: 1.8; font-weight: 600; font-size: 15px;}
+        .units-list { color: #ffd54f; line-height: 1.8; font-weight: 600; font-size: 15px;}
         .empty-hint { color: #555; font-style: italic; font-weight: normal;}
         
         /* 迷你沙盘 */
@@ -154,8 +164,8 @@
             width: 400px;
             height: 260px;
             margin: 0 30px;
-            background-color: #080808;
-            border: 2px solid #333;
+            background-color: #08080a;
+            border: 2px solid #222;
             border-radius: 8px;
             position: relative;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
@@ -180,22 +190,28 @@
 
     <div class="header">
         <h1>钢铁指挥官 (Mechabellum) 战术复盘工作台</h1>
-        <p>毫秒级解析 .grbr / .replay 录像，支持1v1及2v2四人混战，自动生成对局阵型变化</p>
+        <div class="meta-info">
+            工具版本: <span class="highlight">v1.5.0</span> | 
+            架构设计: <span class="highlight">Max Linker with Gemini Pro</span>
+        </div>
         
         <div id="drop-zone">
-            📥 将游戏录像文件拖拽到此处，或点击浏览文件
+            📥 将游戏的 .grbr / .replay 录像文件拖拽到此处解析
         </div>
         <input type="file" id="fileInput" style="display: none" accept=".grbr,.replay">
         
         <div class="controls" id="main-controls">
-            <button onclick="switchMode('player')" id="btnPlayerMode" class="btn-active">▶️ 互动播放器</button>
-            <button onclick="switchMode('list')" id="btnListMode">📜 生成静态长图</button>
+            <button onclick="switchMode('player')" id="btnPlayerMode" class="btn-active">▶️ 互动复盘棋盘</button>
+            <button onclick="switchMode('list')" id="btnListMode">📜 展开静态长图</button>
             <button onclick="toggleLang()" id="btnLang">🌐 切换为 English</button>
-            <button class="btn-primary" onclick="downloadImage()" id="btnDownload">📸 保存当前画面为图片</button>
+            <button class="btn-primary" onclick="downloadImage()" id="btnDownload">📸 保存当前模式为图片分享</button>
         </div>
     </div>
 
     <div id="render-wrapper">
+        <div style="text-align: center;">
+            <div class="game-version-badge" id="gameVersionDisplay">Game Version: 未知</div>
+        </div>
         <div class="players-title">
             <div class="player-name-a" id="playerA">红方队伍</div>
             <div class="vs">VS</div>
@@ -212,7 +228,7 @@
     </div>
 
 <script>
-    // 严格校对官方 Game_glossary.csv 的字典
+    // 严格对照官方 Game_glossary.csv 生成的术语库
     const glossary = {
         "1": { cn: "尖牙", en: "Fang", short: "牙" },
         "2": { cn: "爬虫", en: "Crawler", short: "爬" },
@@ -248,13 +264,13 @@
 
     let appState = {
         lang: 'cn',
-        mode: 'player', // 默认互动模式
+        mode: 'player', 
         currentRoundIndex: 0,
         roundsData: [], 
         bounds: null
     };
 
-    // 拦截全屏拖拽，防止页面被文件替换
+    // 强力拦截拖拽默认行为（解决脱拽无反应的核心）
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
         document.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
     });
@@ -297,52 +313,68 @@
         }
     }
 
-    // ★ 关键修复：安全的毫秒级解码方案
+    // 毫秒级流式底层解码器
     function handleFile(file) {
         if (!file) return;
-        dropZone.innerText = "⏳ 正在极速解析中...";
+        dropZone.innerText = "⏳ 正在极速解析引擎数据...";
+        document.getElementById('render-wrapper').style.display = 'none';
+        document.getElementById('main-controls').style.display = 'none';
         
         const reader = new FileReader();
         reader.onload = function(e) {
-            const buffer = e.target.result;
-            // 采用致命错误忽略的强力解码，剔除引擎二进制前缀
-            const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-            
-            const startIdx = text.indexOf('<?xml');
-            const endIdx = text.lastIndexOf('</BattleRecord>');
-            
-            if (startIdx === -1 || endIdx === -1) {
-                dropZone.innerText = "❌ 解析失败：未检测到有效录像数据";
-                return;
-            }
+            try {
+                // 读取完整字节流，规避编码错误导致的中断
+                const buffer = e.target.result;
+                const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+                
+                // 原生字符串搜索，速度是 for 循环的 10000 倍
+                const startIdx = text.indexOf('<?xml');
+                const endIdx = text.lastIndexOf('</BattleRecord>');
+                
+                if (startIdx === -1 || endIdx === -1) {
+                    throw new Error("未找到游戏 XML 数据结构");
+                }
 
-            const cleanXmlStr = text.substring(startIdx, endIdx + 15);
-            extractData(cleanXmlStr);
-            
-            dropZone.innerText = "✅ 解析成功！可随时拖入新录像";
-            document.getElementById('main-controls').style.display = 'flex';
-            switchMode('player');
+                const cleanXmlStr = text.substring(startIdx, endIdx + 15);
+                extractData(cleanXmlStr);
+                
+                dropZone.innerText = "✅ 解析成功！可随时拖拽新录像替换";
+                document.getElementById('main-controls').style.display = 'flex';
+                switchMode('player');
+            } catch (err) {
+                console.error(err);
+                dropZone.innerText = "❌ 解析失败：" + err.message;
+            }
         };
-        // 读取为 ArrayBuffer 避免任何编码截断
         reader.readAsArrayBuffer(file);
     }
 
-    // ★ 关键重构：支持2v2多玩家阵营合并
+    // 智能提取 1v1 / 2v2 对局数据
     function extractData(xmlStr) {
-        const xml = new DOMParser().parseFromString(xmlStr, "text/xml");
-        const playerRecords = Array.from(xml.querySelectorAll("PlayerRecord"));
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlStr, "text/xml");
         
-        // 按照 team 属性分组
-        let teams = { "0": [], "1": [] };
+        // 提取游戏版本号
+        const versionNode = xml.querySelector("Version");
+        document.getElementById('gameVersionDisplay').innerText = `Game Version: ${versionNode ? versionNode.textContent : "未知"}`;
+
+        const playerRecords = Array.from(xml.querySelectorAll("PlayerRecord"));
+        if (playerRecords.length < 2) throw new Error("录像损坏：玩家数据不足");
+
+        // 动态组队 (处理 2v2)
+        let teams = {};
         playerRecords.forEach(p => {
-            const t = p.querySelector("data > team")?.textContent;
-            if(teams[t]) teams[t].push(p);
+            const t = p.querySelector("data > team")?.textContent || "0";
+            if(!teams[t]) teams[t] = [];
+            teams[t].push(p);
         });
 
-        // 拼接玩家名字
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) throw new Error("队伍数量异常，无法解析对抗结构");
+
         const getName = (tList) => tList.map(p => p.querySelector("name").textContent).join(" & ");
-        document.getElementById('playerA').innerText = (teams["0"].length ? getName(teams["0"]) : "红方") + " (红)";
-        document.getElementById('playerB').innerText = (teams["1"].length ? getName(teams["1"]) : "蓝方") + " (蓝)";
+        document.getElementById('playerA').innerText = getName(teams[teamKeys[0]]) + " (红方)";
+        document.getElementById('playerB').innerText = getName(teams[teamKeys[1]]) + " (蓝方)";
 
         // 计算沙盘自适应边界
         let bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
@@ -354,36 +386,32 @@
             if(y < bounds.minY) bounds.minY = y;
             if(y > bounds.maxY) bounds.maxY = y;
         });
+        if (bounds.minX === Infinity) bounds = { minX: -500, maxX: 500, minY: -500, maxY: 500 };
         bounds.minX -= 60; bounds.maxX += 60; bounds.minY -= 60; bounds.maxY += 60;
         appState.bounds = bounds;
         appState.roundsData = [];
 
-        // 获取回合总数 (以第一个队伍第一个人为准)
-        if(!teams["0"].length) return;
-        const maxRounds = teams["0"][0].querySelectorAll("PlayerRoundRecord").length;
-        
+        const maxRounds = teams[teamKeys[0]][0].querySelectorAll("PlayerRoundRecord").length;
         let historyA = {}, historyB = {};
 
-        // 跳过 R0，从 R1 开始
+        // R0 通常是准备阶段，从 R1 正式开打算起
         for (let r = 1; r < maxRounds; r++) {
-            
-            // 聚合该队伍所有玩家在本回合的单位
             let currUnitsA = [], currUnitsB = [];
             let hpA = "0", hpB = "0";
 
-            teams["0"].forEach((p, idx) => {
+            teams[teamKeys[0]].forEach((p, idx) => {
                 const roundNode = p.querySelectorAll("PlayerRoundRecord")[r];
                 if(roundNode) {
                     if(idx === 0) hpA = roundNode.querySelector("reactorCore")?.textContent || "0";
-                    currUnitsA = currUnitsA.concat(getUnitsDetail(roundNode));
+                    currUnitsA.push(...getUnitsDetail(roundNode));
                 }
             });
 
-            teams["1"].forEach((p, idx) => {
+            teams[teamKeys[1]].forEach((p, idx) => {
                 const roundNode = p.querySelectorAll("PlayerRoundRecord")[r];
                 if(roundNode) {
                     if(idx === 0) hpB = roundNode.querySelector("reactorCore")?.textContent || "0";
-                    currUnitsB = currUnitsB.concat(getUnitsDetail(roundNode));
+                    currUnitsB.push(...getUnitsDetail(roundNode));
                 }
             });
 
@@ -435,7 +463,7 @@
         const container = document.getElementById('timeline-container');
         let html = "";
         let mapsToDraw = [];
-        const hpLabel = appState.lang === 'cn' ? "主堡生命值 :" : "Core HP :";
+        const hpLabel = appState.lang === 'cn' ? "塔血量:" : "Tower HP:";
 
         const renderSingleRow = (data) => {
             const cid = `cvs-r${data.round}`;
@@ -472,6 +500,7 @@
         container.innerHTML = html;
         document.getElementById('render-wrapper').style.display = 'block';
 
+        // 延迟以确保 Canvas 节点挂载完成
         setTimeout(() => {
             mapsToDraw.forEach(m => drawMap(m.id, m.d.unitsA, m.d.unitsB));
         }, 50);
@@ -481,14 +510,13 @@
         let items = [];
         for (let id in diff) {
             let info = glossary[id];
-            let name = info ? info[appState.lang] : `Unknown[${id}]`;
+            let name = info ? info[appState.lang] : `Unit[${id}]`;
             items.push(`${isInit ? "" : "➕ "}${diff[id]} x ${name}`);
         }
-        if (!items.length) return `<span class="empty-hint">${appState.lang==='cn'?'(未招募新单位)':'(No new recruitment)'}</span>`;
+        if (!items.length) return `<span class="empty-hint">${appState.lang==='cn'?'(未招募新部队)':'(No new units)'}</span>`;
         return items.join('<br>');
     }
 
-    // 高精度战术沙盘绘制
     function drawMap(canvasId, unitsA, unitsB) {
         const cvs = document.getElementById(canvasId);
         if (!cvs) return;
@@ -496,12 +524,10 @@
         const w = cvs.width, h = cvs.height;
         const b = appState.bounds;
 
-        // 绘制深色草地背景与网格
         ctx.fillStyle = "#0c0c0e";
         ctx.fillRect(0, 0, w, h);
         
-        // 绘制楚河汉界（中心线）
-        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 8]);
         ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
@@ -514,13 +540,11 @@
             const cx = ((u.x - b.minX) / rangeX) * w;
             const cy = ((u.y - b.minY) / rangeY) * h;
             
-            // 实体圆点
             ctx.beginPath();
             ctx.arc(cx, cy, 9, 0, Math.PI * 2);
             ctx.fillStyle = color;
             ctx.fill();
 
-            // 侧翼绕后标记：外面画个白圈
             if (u.rot) {
                 ctx.strokeStyle = "#fff";
                 ctx.lineWidth = 1.5;
@@ -529,17 +553,16 @@
                 ctx.stroke();
             }
 
-            // 绘制兵种首字母简称
             ctx.fillStyle = "#fff";
-            ctx.font = "bold 10px sans-serif";
+            ctx.font = "bold 11px sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(glossary[u.id]?.short || "?", cx, cy + 1);
         }
 
-        // 先画蓝方再画红方
-        unitsB.forEach(u => renderU(u, "#1e88e5"));
-        unitsA.forEach(u => renderU(u, "#e53935"));
+        // B 是蓝方在右，A 是红方在左 (根据游戏视觉习惯设定)
+        unitsB.forEach(u => renderU(u, "#1e88e5")); 
+        unitsA.forEach(u => renderU(u, "#e53935")); 
     }
 
     function downloadImage() {
@@ -549,11 +572,11 @@
         
         html2canvas(document.getElementById('render-wrapper'), {
             backgroundColor: '#1a1a1d', 
-            scale: 2 // 高清输出
+            scale: 2 // 高清输出，发微信不会糊
         }).then(canvas => {
             const a = document.createElement('a');
             const modeName = appState.mode === 'list' ? '全局图' : `R${appState.roundsData[appState.currentRoundIndex].round}`;
-            a.download = `战术复盘_${modeName}_${new Date().getTime()}.png`;
+            a.download = `钢铁指挥官_复盘_${modeName}_${new Date().getTime()}.png`;
             a.href = canvas.toDataURL("image/png");
             a.click();
             btn.innerText = oldText;
